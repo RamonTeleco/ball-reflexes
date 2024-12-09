@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ball Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas {
+            display: none;
+        }
+        #score, #timer, #return-button {
+            position: absolute;
+            color: white;
+            font-size: 20px;
+            font-family: Arial, sans-serif;
+        }
+        #score, #timer {
+            display: none;
+        }
+        #score {
+            top: 10px;
+            left: 10px;
+        }
+        #timer {
+            top: 10px;
+            right: 10px;
+        }
+        #return-button {
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            background-color: white;
+            color: black;
+            padding: 5px 10px;
+            border: none;
+            cursor: pointer;
+        }
+        #menu, #game-over {
+            color: white;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        #menu button, #game-over button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="menu">
+        <button onclick="startEasy()">EASY</button>
+        <button onclick="startGame()">MEDIUM</button>
+        <button onclick="startDifficult()">DIFFICULT</button>
+    </div>
+
+    <div id="game-over" style="display: none;">
+        <h1 id="game-over-text"></h1>
+        <button onclick="restartGame()">Restart Game</button>
+    </div>
+
+    <div id="score">Score: 0</div>
+    <div id="timer">Time: 100</div>
+    <button id="return-button" onclick="restartGame()">Return to Menu</button>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const timerElement = document.getElementById('timer');
+        const returnButton = document.getElementById('return-button');
+        const menu = document.getElementById('menu');
+        const gameOverScreen = document.getElementById('game-over');
+        const gameOverText = document.getElementById('game-over-text');
+
+        let balls = [];
+        let totalBalls = 110;
+        let score = 0;
+        let timer = 100;
+        let granateBallIndex;
+        let timerInterval;
+        let speedMultiplier = 1;
+
+        class Ball {
+            constructor(x, y, radius, color, speedX, speedY) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.color = color;
+                this.speedX = speedX * speedMultiplier;
+                this.speedY = speedY * speedMultiplier;
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.closePath();
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+
+                if (this.x - this.radius < 0 || this.x + this.radius > canvas.width) {
+                    this.speedX *= -1;
+                }
+                if (this.y - this.radius < 0 || this.y + this.radius > canvas.height) {
+                    this.speedY *= -1;
+                }
+
+                this.draw();
+            }
+        }
+
+        function initializeBalls() {
+            balls = [];
+            for (let i = 0; i < totalBalls; i++) {
+                const radius = 15;
+                const x = Math.random() * (canvas.width - radius * 2) + radius;
+                const y = Math.random() * (canvas.height - radius * 2) + radius;
+                const speedX = (Math.random() - 0.5) * 2;
+                const speedY = (Math.random() - 0.5) * 2;
+                const color = i === granateBallIndex ? 'maroon' : 'red';
+                balls.push(new Ball(x, y, radius, color, speedX, speedY));
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            balls.forEach(ball => ball.update());
+        }
+
+        function checkClick(event) {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+
+            balls.forEach((ball, index) => {
+                const distance = Math.sqrt(
+                    (mouseX - ball.x) ** 2 + (mouseY - ball.y) ** 2
+                );
+
+                if (distance < ball.radius && index === granateBallIndex) {
+                    score++;
+                    scoreElement.textContent = `Score: ${score}`;
+
+                    if (speedMultiplier === 0.8) { // EASY mode logic
+                        balls.splice(index, 1);
+                        totalBalls--;
+                        if (totalBalls > 0) {
+                            granateBallIndex = Math.floor(Math.random() * totalBalls);
+                            balls[granateBallIndex].color = 'maroon';
+                        }
+                    } else {
+                        ball.color = 'red';
+                        granateBallIndex = Math.floor(Math.random() * totalBalls);
+                        balls[granateBallIndex].color = 'maroon';
+                    }
+                }
+            });
+        }
+
+        function countdown() {
+            if (timer > 0) {
+                timer--;
+                timerElement.textContent = `Time: ${timer}`;
+            } else {
+                endGame();
+            }
+        }
+
+        function startGame() {
+            startMode(1, 110); // MEDIUM mode
+        }
+
+        function startEasy() {
+            startMode(0.8, 80); // EASY mode
+        }
+
+        function startDifficult() {
+            startMode(2, 110); // DIFFICULT mode
+        }
+
+        function startMode(speed, ballsCount) {
+            menu.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            canvas.style.display = 'block';
+            scoreElement.style.display = 'block';
+            timerElement.style.display = 'block';
+            returnButton.style.display = 'block';
+
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            score = 0;
+            timer = 100;
+            totalBalls = ballsCount;
+            granateBallIndex = Math.floor(Math.random() * totalBalls);
+            speedMultiplier = speed;
+
+            initializeBalls();
+
+            timerInterval = setInterval(countdown, 1000);
+
+            function animate() {
+                if (timer > 0) {
+                    draw();
+                    requestAnimationFrame(animate);
+                }
+            }
+
+            animate();
+        }
+
+        function endGame() {
+            clearInterval(timerInterval);
+            canvas.style.display = 'none';
+            scoreElement.style.display = 'none';
+            timerElement.style.display = 'none';
+            returnButton.style.display = 'none';
+
+            let message = '';
+            if (score <= 10) {
+                message = "Your reflexes are slow, you should keep practicing.";
+            } else if (score <= 30) {
+                message = "Your reflexes are average, but could improve with practice.";
+            } else if (score <= 59) {
+                message = "Wow, you're quite fast. Your reflexes are almost Jedi-like.";
+            } else if (score <= 80) {
+                message = "Even Spiderman has slower reflexes than you. Can you beat 80 points?";
+            } else {
+                message = "You're a reflex beast, scoring almost a point per second. Unbelievable!";
+            }
+
+            gameOverText.textContent = message;
+            gameOverScreen.style.display = 'flex';
+        }
+
+        function restartGame() {
+            menu.style.display = 'flex';
+            canvas.style.display = 'none';
+            returnButton.style.display = 'none';
+        }
+
+        canvas.addEventListener('click', checkClick);
+    </script>
+</body>
+</html>
